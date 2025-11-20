@@ -73,7 +73,7 @@ TMP=$$(mktemp -d)
 trap "rm -rf ${TMP}" EXIT
 export CARGO_TARGET_DIR="${TMP}/cargo-target"
 export RUSTFLAGS="--cfg target_has_reliable_f128=false -C panic=abort -C linker-flavor=llbc -Z unstable-options -C target-feature=-crt-static -C link-args=-nostdlib -nostartfiles -nodefaultlibs"
-export RUSTC="$(exe //stage1:rustc)"
+export RUSTC="$(exe //stage0:rustc)"
 cd hostcall-demo/culinux
 cargo +nightly build --release --target nvptx64-nvidia-linux.json -Z build-std=core,std,panic_abort
 OBJ_DIR="${TMP}/objects"
