@@ -72,9 +72,9 @@ def rust_bootstrap_library(
     extra_rustc_flags = []
     extra_srcs = []
 
-    if crate_root.startswith("rust/library/"):
+    if hasattr(crate_root, "startswith") and crate_root.startswith("rust/library/"):
         default_target_platform = "//platforms/stage1:library"
-    elif crate_root.startswith("rust/compiler/") or crate_root.startswith("rust/src/"):
+    elif hasattr(crate_root, "startswith") and (crate_root.startswith("rust/compiler/") or crate_root.startswith("rust/src/")):
         default_target_platform = "//platforms/stage1:compiler"
         messages_ftl = glob(["rust/compiler/{}/messages.ftl".format(crate)])
         if messages_ftl:
@@ -165,9 +165,9 @@ def cxx_bootstrap_library(
     )
 
 def _target_constraints(crate_root):
-    if crate_root and crate_root.startswith("rust/library/"):
+    if crate_root and hasattr(crate_root, "startswith") and crate_root.startswith("rust/library/"):
         target_compatible_with = ["//constraints:library"]
-    elif crate_root and (crate_root.startswith("rust/compiler/") or crate_root.startswith("rust/src/")):
+    elif crate_root and hasattr(crate_root, "startswith") and (crate_root.startswith("rust/compiler/") or crate_root.startswith("rust/src/")):
         target_compatible_with = ["//constraints:compiler"]
     else:
         target_compatible_with = select({

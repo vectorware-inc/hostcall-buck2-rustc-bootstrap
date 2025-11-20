@@ -991,6 +991,15 @@ rust_bootstrap_library(
     crate_root = "cfg-if-1.0.4.crate/src/lib.rs",
     edition = "2018",
     platform = {
+        "rust//constraints:target=nvptx64": dict(
+            features = [
+                "core",
+                "rustc-dep-of-std",
+            ],
+            named_deps = {
+                "core": ":rustc-std-workspace-core-1.99.0",
+            },
+        ),
         "linux-arm64-library": dict(
             features = [
                 "core",
@@ -4688,9 +4697,19 @@ crate_download(
 
 rust_bootstrap_library(
     name = "libc-0.2.174",
-    srcs = [":libc-0.2.174.crate"],
+    srcs = [
+        ":libc-0.2.174.crate",
+    ] + select({
+        "rust//constraints:target=nvptx64": glob([
+            "fixups/libc/libc_hostcall/**/*.rs",
+        ]),
+        "DEFAULT": [],
+    }),
     crate = "libc",
-    crate_root = "libc-0.2.174.crate/src/lib.rs",
+    crate_root = select({
+        "rust//constraints:target=nvptx64": "fixups/libc/libc_hostcall/lib.rs",
+        "DEFAULT": "libc-0.2.174.crate/src/lib.rs",
+    }),
     edition = "2021",
     env = {
         "OUT_DIR": "$(location :libc-0.2.174-build-script-run[out_dir])",
@@ -4790,6 +4809,19 @@ rust_bootstrap_library(
                 "default",
                 "std",
             ],
+        ),
+        "nvptx64-vectorware-library": dict(
+            features = [
+                "align",
+                "rustc-dep-of-std",
+                "rustc-std-workspace-core",
+            ],
+            deps = [
+                ":rustc-std-workspace-core-1.99.0",
+            ],
+            env = {
+                "RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-linux.json)",
+            },
         ),
     },
     rustc_flags = ["@$(location :libc-0.2.174-build-script-run[rustc_flags])"],
