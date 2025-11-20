@@ -67,9 +67,9 @@ native.genrule(
         ],
     ),
     out = "libculinux.ptx",
-    cmd = """
-bash -c 'set -euo pipefail
-TMP=$$(mktemp -d)
+    cmd = """cat >cmd.sh <<'EOS'
+set -euo pipefail
+TMP=$(mktemp -d)
 trap "rm -rf ${TMP}" EXIT
 export CARGO_TARGET_DIR="${TMP}/cargo-target"
 export RUSTFLAGS="--cfg target_has_reliable_f128=false -C panic=abort -C linker-flavor=llbc -Z unstable-options -C target-feature=-crt-static -C link-args=-nostdlib -nostartfiles -nodefaultlibs"
@@ -85,8 +85,9 @@ opt -passes="internalize,globaldce" "${TMP}/libculinux.bc" -o "${TMP}/libculinux
 opt -O1 "${TMP}/libculinux.opt.bc" -o "${TMP}/libculinux.opt.bc"
 llc -mcpu=sm_89 "${TMP}/libculinux.opt.bc" -o "${TMP}/libculinux.ptx"
 sed -i "s/sm_75/sm_89/g" "${TMP}/libculinux.ptx"
-cp "${TMP}/libculinux.ptx" '"$OUT"'
-'
+cp "${TMP}/libculinux.ptx" "$OUT"
+EOS
+bash cmd.sh
 """,
     visibility = ["PUBLIC"],
 )
