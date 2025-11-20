@@ -176,7 +176,9 @@ rust_toolchain(
         # Use stage0 sysroot for nvptx; avoids keep visibility/cycle issues.
         "DEFAULT": "rust//stage0:sysroot",
     }),
-    target_compatible_with = [],
+    target_compatible_with = [
+        "rust//constraints:target=nvptx64",
+    ],
     target_triple = "//target:rustc_target_triple_nvptx",
     visibility = ["PUBLIC"],
 )
