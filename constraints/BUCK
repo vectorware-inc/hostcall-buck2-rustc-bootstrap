@@ -36,6 +36,14 @@ constraint(
     ],
 )
 
+constraint(
+    setting = "target",
+    values = [
+        "target=host",
+        "target=nvptx64",
+    ],
+)
+
 config_setting(
     name = "library-build-script",
     constraint_values = [

@@ -4,6 +4,7 @@ target_triple(
     name = "rustc_target_triple",
     incoming_transition = "rust//stage0:stage0_configuration",
     value = select({
+        "rust//constraints:target=nvptx64": "nvptx64-nvidia-cuda",
         "prelude//os:linux": select({
             "prelude//cpu:arm64": "aarch64-unknown-linux-gnu",
             "prelude//cpu:riscv64": "riscv64gc-unknown-linux-gnu",

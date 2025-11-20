@@ -6,6 +6,7 @@ execution_platform(
     constraint_values = [
         host_configuration.cpu,
         host_configuration.os,
+        "rust//constraints:target=host",
     ],
     visibility = ["PUBLIC"],
 )
@@ -14,6 +15,7 @@ execution_platforms(
     name = "execution",
     platforms = [
         ":host",
+        "//platforms/nvptx:execution",
         "//platforms/stage1:compiler-build-script",
         "//platforms/stage1:library-build-script",
         "//platforms/stage2:compiler-build-script",

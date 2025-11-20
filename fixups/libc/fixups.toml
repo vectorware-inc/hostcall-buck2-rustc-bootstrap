@@ -1,1 +1,4 @@
 buildscript.run = true
+
+['cfg(target_arch = "nvptx64")']
+extra_deps = ["//hostcall-demo:libc_hostcall"]

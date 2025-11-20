@@ -18,6 +18,7 @@ execution_platform(
     constraint_values = [
         "//constraints:build-script=true",
         "//constraints:opt-level=0",
+        "rust//constraints:target=host",
     ],
     visibility = ["PUBLIC"],
 )
@@ -40,6 +41,7 @@ execution_platform(
     constraint_values = [
         "//constraints:build-script=true",
         "//constraints:opt-level=0",
+        "rust//constraints:target=host",
     ],
     visibility = ["PUBLIC"],
 )

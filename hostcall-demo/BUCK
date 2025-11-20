@@ -1,0 +1,92 @@
+load(
+    "//:defs.bzl",
+    "rust_bootstrap_binary",
+    "rust_bootstrap_library",
+)
+
+rust_bootstrap_library(
+    name = "hostcalls_lib",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = ["src/main.rs"],
+    ),
+    crate = "hostcalls",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    visibility = ["PUBLIC"],
+    deps = ["//hostcall-demo/third-party:cust"],
+)
+
+rust_bootstrap_library(
+    name = "libc_hostcall",
+    srcs = [],  # placeholder; see nvptx-specific rule below
+    crate = "libc_hostcall",
+    crate_root = "libc-hostcall/src/lib.rs",
+    edition = "2024",
+    visibility = ["PUBLIC"],
+)
+
+# NVPTX build of libc_hostcall forcing the nvptx toolchain and platform.
+native.rust_library(
+    name = "libc_hostcall_nvptx",
+    crate = "libc_hostcall",
+    crate_root = "libc-hostcall/src/lib.rs",
+    srcs = glob(["libc-hostcall/src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["PUBLIC"],
+    default_target_platform = "//platforms/nvptx:library",
+    _rust_toolchain = "toolchains//:rust_nvptx",
+)
+
+rust_bootstrap_binary(
+    name = "hostcalls_bin",
+    crate = "hostcalls",
+    crate_root = "src/main.rs",
+    edition = "2024",
+    visibility = ["PUBLIC"],
+    env = {
+        "HOSTCALL_PTX_PATH": "$(location :culinux_ptx)",
+    },
+    deps = [
+        ":hostcalls_lib",
+        ":culinux_ptx",
+    ],
+)
+
+# Legacy PTX build via Cargo/llvm toolchain until native PTX emission is wired.
+native.genrule(
+    name = "culinux_ptx",
+    srcs = glob(
+        [
+            "culinux/**",
+            "libc-hostcall/**",
+        ],
+        exclude = [
+            "culinux/target/**",
+            "libc-hostcall/target/**",
+        ],
+    ),
+    out = "libculinux.ptx",
+    cmd = """
+bash -c 'set -euo pipefail
+TMP=$$(mktemp -d)
+trap "rm -rf ${TMP}" EXIT
+export CARGO_TARGET_DIR="${TMP}/cargo-target"
+export RUSTFLAGS="--cfg target_has_reliable_f128=false -C panic=abort -C linker-flavor=llbc -Z unstable-options -C target-feature=-crt-static -C link-args=-nostdlib -nostartfiles -nodefaultlibs"
+export RUSTC="$(exe //stage1:rustc)"
+cd hostcall-demo/culinux
+cargo +nightly build --release --target nvptx64-nvidia-linux.json -Z build-std=core,std,panic_abort
+OBJ_DIR="${TMP}/objects"
+mkdir -p "${OBJ_DIR}"
+( cd "${OBJ_DIR}" && ar x "${CARGO_TARGET_DIR}/nvptx64-nvidia-linux/release/libculinux.a" )
+llvm-link ${OBJ_DIR}/*.o -o "${TMP}/libculinux.bc"
+llvm-dis "${TMP}/libculinux.bc" -o "${TMP}/libculinux.ll"
+opt -passes="internalize,globaldce" "${TMP}/libculinux.bc" -o "${TMP}/libculinux.opt.bc"
+opt -O1 "${TMP}/libculinux.opt.bc" -o "${TMP}/libculinux.opt.bc"
+llc -mcpu=sm_89 "${TMP}/libculinux.opt.bc" -o "${TMP}/libculinux.ptx"
+sed -i "s/sm_75/sm_89/g" "${TMP}/libculinux.ptx"
+cp "${TMP}/libculinux.ptx" '"$OUT"'
+'
+""",
+    visibility = ["PUBLIC"],
+)

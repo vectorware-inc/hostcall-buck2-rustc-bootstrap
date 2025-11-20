@@ -1,0 +1,27 @@
+load("//platforms:defs.bzl", "execution_platform", "target_platform")
+
+target_platform(
+    name = "library",
+    base = "//platforms/stage1:library",
+    constraint_values = [
+        "rust//constraints:target=nvptx64",
+    ],
+    transition = [
+        "//constraints:bootstrap-stage",
+        "//constraints:build-script",
+        "//constraints:opt-level",
+        "//constraints:workspace",
+    ],
+    visibility = ["PUBLIC"],
+)
+
+execution_platform(
+    name = "execution",
+    base = "//platforms:host",
+    constraint_values = [
+        "rust//constraints:target=nvptx64",
+        "//constraints:build-script=true",
+        "//constraints:opt-level=0",
+    ],
+    visibility = ["PUBLIC"],
+)

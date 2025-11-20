@@ -15,9 +15,19 @@ def platform_info_label(constraints: dict[TargetLabel, ConstraintValueInfo]) -> 
     build_script = settings.get("rust//constraints:build-script")
     os = settings.get("prelude//os/constraints:os")
     cpu = settings.get("prelude//cpu/constraints:cpu")
+    target = settings.get("rust//constraints:target")
 
     host_os = host_configuration.os.split(":")[1]
     host_cpu = host_configuration.cpu.split(":")[1]
+
+    target_suffix = ""
+    if target and target != "target=host":
+        target_suffix = target.split("target=")[1]
+
+    if target == "target=nvptx64" and stage and workspace:
+        if build_script == "build-script=true":
+            return "rust//platforms/nvptx:{}-build-script".format(workspace)
+        return "rust//platforms/nvptx:{}".format(workspace)
 
     if not stage and not workspace and not build_script and os == host_os and cpu == host_cpu:
         return "rust//platforms:host"
@@ -26,13 +36,21 @@ def platform_info_label(constraints: dict[TargetLabel, ConstraintValueInfo]) -> 
         label = "rust//platforms/{}:{}".format(stage, workspace)
         if build_script == "build-script=true":
             label += "-build-script"
+        if target_suffix:
+            label += "-{}".format(target_suffix)
         return label
 
     if os and cpu:
-        return "{}-{}".format(os, cpu)
+        base = "{}-{}".format(os, cpu)
+        if target_suffix:
+            base = "{}-{}".format(base, target_suffix)
+        return base
 
     if os or cpu:
-        return os or cpu
+        base = os or cpu
+        if target_suffix:
+            base = "{}-{}".format(base, target_suffix)
+        return base
 
     if len(settings) == 0:
         return "null"

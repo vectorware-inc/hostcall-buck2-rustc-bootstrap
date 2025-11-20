@@ -5,6 +5,7 @@ load("@prelude//rust:proc_macro_alias.bzl", "rust_proc_macro_alias")
 load("@prelude//utils:type_defs.bzl", "is_select")
 load("//constraints:defs.bzl", "transition_alias")
 
+
 def rust_bootstrap_alias(actual, **kwargs):
     if not actual.endswith("-0.0.0"):
         native.alias(
@@ -173,6 +174,8 @@ def _target_constraints(crate_root):
             "DEFAULT": ["prelude//:none"],
             "//constraints:compiler": [],
             "//constraints:library": [],
+            "rust//constraints:target=nvptx64": [],
+            "rust//constraints:target=host": [],
         })
 
     return target_compatible_with

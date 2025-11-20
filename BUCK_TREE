@@ -18,6 +18,7 @@ set_cfg_constructor(
         aarch64 = "prelude//cpu/constraints:arm64",
         riscv64 = "prelude//cpu/constraints:riscv64",
         x86_64 = "prelude//cpu/constraints:x86_64",
+        nvptx = "//constraints:target=nvptx64",
         # Operating system (prelude//os/constraints:os)
         linux = "prelude//os/constraints:linux",
         macos = "prelude//os/constraints:macos",

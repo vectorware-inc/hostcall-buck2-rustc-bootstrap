@@ -1,0 +1,7 @@
+[package]
+name = "hostcalls"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cust = "0.3.2"
