@@ -137,7 +137,6 @@ rust_toolchain(
 rust_toolchain(
     name = "rust_nvptx",
     exec_compatible_with = [
-        "rust//constraints:target=nvptx64",
         "rust//constraints:opt-level=0",
         "rust//constraints:build-script=true",
     ],
