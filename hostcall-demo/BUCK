@@ -67,27 +67,20 @@ native.genrule(
         ],
     ),
     out = "libculinux.ptx",
-    cmd = """cat >cmd.sh <<'EOS'
-set -euo pipefail
-TMP=$(mktemp -d)
-trap "rm -rf ${TMP}" EXIT
-export CARGO_TARGET_DIR="${TMP}/cargo-target"
-export RUSTFLAGS="--cfg target_has_reliable_f128=false -C panic=abort -C linker-flavor=llbc -Z unstable-options -C target-feature=-crt-static -C link-args=-nostdlib -nostartfiles -nodefaultlibs"
-export RUSTC="$(exe //stage0:rustc)"
-cd hostcall-demo/culinux
-cargo +nightly build --release --target nvptx64-nvidia-linux.json -Z build-std=core,std,panic_abort
-OBJ_DIR="${TMP}/objects"
-mkdir -p "${OBJ_DIR}"
-( cd "${OBJ_DIR}" && ar x "${CARGO_TARGET_DIR}/nvptx64-nvidia-linux/release/libculinux.a" )
-llvm-link ${OBJ_DIR}/*.o -o "${TMP}/libculinux.bc"
-llvm-dis "${TMP}/libculinux.bc" -o "${TMP}/libculinux.ll"
-opt -passes="internalize,globaldce" "${TMP}/libculinux.bc" -o "${TMP}/libculinux.opt.bc"
-opt -O1 "${TMP}/libculinux.opt.bc" -o "${TMP}/libculinux.opt.bc"
-llc -mcpu=sm_89 "${TMP}/libculinux.opt.bc" -o "${TMP}/libculinux.ptx"
-sed -i "s/sm_75/sm_89/g" "${TMP}/libculinux.ptx"
-cp "${TMP}/libculinux.ptx" "$OUT"
-EOS
-bash cmd.sh
-""",
+    cmd = "bash -c 'set -euo pipefail; TMP=$$(mktemp -d); trap \"rm -rf $$TMP\" EXIT; "
+        + "export CARGO_TARGET_DIR=\"$$TMP/cargo-target\"; "
+        + "export RUSTFLAGS=\"--cfg target_has_reliable_f128=false -C panic=abort -C linker-flavor=llbc -Z unstable-options -C target-feature=-crt-static -C link-args=-nostdlib -nostartfiles -nodefaultlibs\"; "
+        + "export RUSTC=$(exe //stage0:rustc); "
+        + "cd hostcall-demo/culinux; "
+        + "cargo +nightly build --release --target nvptx64-nvidia-linux.json -Z build-std=core,std,panic_abort; "
+        + "OBJ_DIR=\"$$TMP/objects\"; mkdir -p \"$$OBJ_DIR\"; "
+        + "( cd \"$$OBJ_DIR\" && ar x \"$$CARGO_TARGET_DIR/nvptx64-nvidia-linux/release/libculinux.a\" ); "
+        + "llvm-link $$OBJ_DIR/*.o -o \"$$TMP/libculinux.bc\"; "
+        + "llvm-dis \"$$TMP/libculinux.bc\" -o \"$$TMP/libculinux.ll\"; "
+        + "opt -passes=\\\"internalize,globaldce\\\" \"$$TMP/libculinux.bc\" -o \"$$TMP/libculinux.opt.bc\"; "
+        + "opt -O1 \"$$TMP/libculinux.opt.bc\" -o \"$$TMP/libculinux.opt.bc\"; "
+        + "llc -mcpu=sm_89 \"$$TMP/libculinux.opt.bc\" -o \"$$TMP/libculinux.ptx\"; "
+        + "sed -i \"s/sm_75/sm_89/g\" \"$$TMP/libculinux.ptx\"; "
+        + "cp \"$$TMP/libculinux.ptx\" \"$OUT\"' ",
     visibility = ["PUBLIC"],
 )
