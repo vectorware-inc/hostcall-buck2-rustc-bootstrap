@@ -32,6 +32,10 @@ set_cfg_constructor(
 
 set_reindeer_platforms(
     select({
+        "rust//constraints:target=nvptx64": select({
+            "//constraints:library": "nvptx64-vectorware-library",
+            "//constraints:compiler": "nvptx64-vectorware-compiler",
+        }),
         "prelude//os:linux": select({
             "prelude//cpu:arm64": select({
                 "//constraints:library": "linux-arm64-library",

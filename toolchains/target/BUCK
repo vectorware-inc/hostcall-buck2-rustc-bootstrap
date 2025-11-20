@@ -4,7 +4,7 @@ target_triple(
     name = "rustc_target_triple",
     incoming_transition = "rust//stage0:stage0_configuration",
     value = select({
-        "rust//constraints:target=nvptx64": "nvptx64-nvidia-cuda",
+        "rust//constraints:target=nvptx64": "nvptx64-vectorware-linux",
         "prelude//os:linux": select({
             "prelude//cpu:arm64": "aarch64-unknown-linux-gnu",
             "prelude//cpu:riscv64": "riscv64gc-unknown-linux-gnu",
@@ -42,5 +42,12 @@ target_triple(
             "prelude//cpu:x86_64": "x86_64-pc-windows-msvc",
         }),
     }),
+    visibility = ["PUBLIC"],
+)
+
+# Constant nvptx triple for GPU toolchains.
+target_triple(
+    name = "rustc_target_triple_nvptx",
+    value = "nvptx64-vectorware-linux",
     visibility = ["PUBLIC"],
 )

@@ -11,6 +11,17 @@ load(":defs.bzl", "SYSROOT_CRATES", "rust_dist", "rust_tool", "sysroot")
     for crate in SYSROOT_CRATES
 ]
 
+# NVPTX variants of the sysroot crates so we can build a GPU sysroot.
+[
+    transition_alias(
+        name = "{}__nvptx".format(crate),
+        actual = "//:{}".format(crate),
+        incoming_transition = "//platforms/nvptx:library",
+        visibility = ["PUBLIC"],
+    )
+    for crate in SYSROOT_CRATES
+]
+
 transition_alias(
     name = "rust_allocator",
     actual = "//allocator:rust_allocator",
@@ -47,6 +58,15 @@ sysroot(
     incoming_transition = "//platforms/stage1:library",
     visibility = ["toolchains//:rust"],
     deps = [":{}".format(crate) for crate in SYSROOT_CRATES],
+)
+
+# Sysroot built for the nvptx platform using the nvptx toolchain.
+sysroot(
+    name = "sysroot_nvptx",
+    incoming_transition = "//platforms/nvptx:library",
+    rust_toolchain = "toolchains//:rust_nvptx",
+    visibility = ["PUBLIC"],
+    deps = [":{}__nvptx".format(crate) for crate in SYSROOT_CRATES],
 )
 
 rust_dist(

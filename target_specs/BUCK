@@ -3,3 +3,17 @@ export_file(
     src = "nvptx64-nvidia-cuda.json",
     visibility = ["PUBLIC"],
 )
+
+export_file(
+    name = "nvptx64-vectorware-linux",
+    src = "nvptx64-vectorware-linux.json",
+    visibility = ["PUBLIC"],
+)
+
+genrule(
+    name = "nvptx64-vectorware-target-dir",
+    srcs = [":nvptx64-vectorware-linux"],
+    out = "nvptx64-vectorware-linux-spec",
+    cmd = "mkdir -p $OUT && cp $(location :nvptx64-vectorware-linux) $OUT/",
+    visibility = ["PUBLIC"],
+)

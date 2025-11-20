@@ -2,8 +2,11 @@ load("//platforms:defs.bzl", "execution_platform", "target_platform")
 
 target_platform(
     name = "library",
-    base = "//platforms/stage1:library",
     constraint_values = [
+        "//constraints:library",
+        "//constraints:stage1",
+        "//constraints:build-script=false",
+        "//constraints:opt-level=3",
         "rust//constraints:target=nvptx64",
     ],
     transition = [

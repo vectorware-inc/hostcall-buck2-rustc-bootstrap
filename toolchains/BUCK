@@ -156,6 +156,7 @@ rust_toolchain(
             "rust//constraints:opt-level=0": "-Copt-level=0",
             "rust//constraints:opt-level=3": "-Copt-level=3",
         }),
+        "--target=nvptx64-vectorware-linux",
         "-Ctarget-cpu=sm_89",
     ] + select({
         "rust//constraints:stage1": select({
@@ -176,7 +177,7 @@ rust_toolchain(
         "DEFAULT": "rust//stage0:sysroot",
     }),
     target_compatible_with = [],
-    target_triple = "//target:rustc_target_triple",
+    target_triple = "//target:rustc_target_triple_nvptx",
     visibility = ["PUBLIC"],
 )
 

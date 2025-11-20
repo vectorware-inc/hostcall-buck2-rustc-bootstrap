@@ -78,3 +78,11 @@ workspace = ["library"]
 [platform.windows-gnu-compiler]
 target = "x86_64-pc-windows-gnu"
 workspace = ["compiler"]
+
+[platform.nvptx64-vectorware-library]
+target = "nvptx64-vectorware-linux"
+workspace = ["library"]
+
+[platform.nvptx64-vectorware-compiler]
+target = "nvptx64-vectorware-linux"
+workspace = ["compiler"]
