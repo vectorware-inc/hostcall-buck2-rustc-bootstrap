@@ -13,6 +13,8 @@ target_platform(
         "//constraints:bootstrap-stage",
         "//constraints:build-script",
         "//constraints:opt-level",
+        "prelude//os/constraints:os",
+        "rust//constraints:target",
         "//constraints:workspace",
     ],
     visibility = ["PUBLIC"],

@@ -144,14 +144,9 @@ fn write_return_slot(module: &Module, slot_bytes: u64, value: u64) {
 
 fn main() {
     let ctxt = cust::quick_init().unwrap();
-    let ptx_path = env::var("HOSTCALL_PTX")
-        .or_else(|_| {
-            option_env!("HOSTCALL_PTX_PATH")
-                .map(|s| s.to_string())
-                .ok_or(env::VarError::NotPresent)
-        })
-        .unwrap_or_else(|_| "test.ptx".to_string());
-    let module = Arc::new(Module::from_file(&ptx_path).unwrap());
+    let module = Arc::new(
+        Module::from_ptx(std::str::from_utf8(culinux_ptx_rs::PTX).unwrap(), &[]).unwrap(),
+    );
     let mut runtime = Runtime::new(module.clone()).unwrap();
     runtime.register_hostcall("open", open).unwrap();
     runtime.register_hostcall("write", write).unwrap();

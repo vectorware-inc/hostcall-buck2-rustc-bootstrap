@@ -73,6 +73,7 @@ rust_bootstrap_binary(
     deps = [
         ":hostcalls_lib",
         "//hostcall-demo/third-party:cust",
+        ":culinux_ptx_rs_lib",
     ],
 )
 
@@ -109,5 +110,23 @@ transition_alias(
     name = "culinux_ptx",
     actual = ":culinux_ptx_raw",
     incoming_transition = "//platforms/nvptx:library",
+    visibility = ["PUBLIC"],
+)
+
+# Small Rust wrapper to embed the generated PTX directly into the host binary.
+native.genrule(
+    name = "culinux_ptx_rs",
+    srcs = [":culinux_ptx"],
+    out = "culinux_ptx.rs",
+    cmd = "echo 'pub static PTX: &[u8] = include_bytes!(\"$(location :culinux_ptx)\");' > \"$OUT\"",
+    visibility = ["PUBLIC"],
+)
+
+rust_bootstrap_library(
+    name = "culinux_ptx_rs_lib",
+    srcs = [":culinux_ptx_rs"],
+    crate = "culinux_ptx_rs",
+    crate_root = "culinux_ptx.rs",
+    edition = "2024",
     visibility = ["PUBLIC"],
 )
