@@ -130,11 +130,19 @@ native.genrule(
     srcs = [":culinux_ptx"],
     out = "culinux_ptx.rs",
     cmd = "PTX=$(location :culinux_ptx); "
-        + "HASH=`sha256sum \"$PTX\" | cut -d\" \" -f1`; "
-        + "cat > \"$OUT\" <<EOF\n"
-        + "pub static PTX: &[u8] = include_bytes!(\"$PTX\");\n"
-        + "pub const PTX_HASH: &str = \"$HASH\";\n"
-        + "EOF",
+        + "python - <<'PY'\n"
+        + "from pathlib import Path\n"
+        + "ptx = Path(\"$PTX\").read_bytes()\n"
+        + "with open(\"$OUT\", \"w\") as f:\n"
+        + "    f.write(\"pub static PTX: &[u8] = &[\\n\")\n"
+        + "    for i, b in enumerate(ptx):\n"
+        + "        if i % 12 == 0:\n"
+        + "            f.write(\"    \")\n"
+        + "        f.write(f\"0x{b:02x}, \")\n"
+        + "        if (i + 1) % 12 == 0:\n"
+        + "            f.write(\"\\n\")\n"
+        + "    f.write(\"\\n];\\n\")\n"
+        + "PY",
     visibility = ["PUBLIC"],
 )
 
