@@ -49,7 +49,6 @@ rust_bootstrap_library(
     resources = [
         "//target_specs:nvptx64-vectorware-target-dir",
     ],
-    target_compatible_with = [],
     rustc_flags = [
         "-Zunstable-options",
         "-Cpanic=abort",
@@ -58,7 +57,15 @@ rust_bootstrap_library(
         ":libc_hostcall_nvptx",
         "//:alloc",
     ],
+    target_compatible_with = ["//constraints:target=nvptx64"],
     _rust_toolchain = "toolchains//:rust_nvptx_full",
+)
+
+transition_alias(
+    name = "culinux_nvptx_alias",
+    actual = ":culinux_nvptx",
+    incoming_transition = "//platforms/nvptx:library",
+    visibility = ["PUBLIC"],
 )
 
 rust_bootstrap_binary(
@@ -77,11 +84,10 @@ rust_bootstrap_binary(
     ],
 )
 
-# Build PTX from the nvptx rlib using the bootstrap toolchain + bundled LLVM.
 native.genrule(
     name = "culinux_ptx_raw",
     srcs = [
-        ":culinux_nvptx[static_pic]",
+        ":culinux_nvptx_alias[static_pic]",
         "//stage0:ci_llvm",
         "//stage1:std__nvptx[static]",
         "//stage1:alloc__nvptx[static]",
@@ -89,13 +95,14 @@ native.genrule(
         "//stage1:compiler_builtins__nvptx[static]",
         "//stage1:panic_abort__nvptx[static]",
         ":libc_hostcall_nvptx[static]",
-    ],
+        # Ensure PTX rebuilds when the kernel source changes.
+    ] + glob(["culinux/src/**/*.rs"]),
     default_target_platform = "//platforms/nvptx:library",
-    target_compatible_with = [],
+    target_compatible_with = ["//constraints:target=nvptx64"],
     out = "libculinux.ptx",
     cmd = "bash -c 'set -euo pipefail; TMP=/tmp/culinux-$$; rm -rf \"$TMP\"; mkdir -p \"$TMP\"; trap \"rm -rf $TMP\" EXIT; "
         + "SRCDIR=\"$PWD\"; OUT=\"$PWD/$OUT\"; LLVM_DIR=\"$PWD/ci-llvm\"; "
-        + "LIBS=\"$SRCDIR/$(location :culinux_nvptx[static_pic]) $SRCDIR/$(location //stage1:std__nvptx[static]) $SRCDIR/$(location //stage1:alloc__nvptx[static]) $SRCDIR/$(location //stage1:core__nvptx[static]) $SRCDIR/$(location //stage1:compiler_builtins__nvptx[static]) $SRCDIR/$(location //stage1:panic_abort__nvptx[static]) $SRCDIR/$(location :libc_hostcall_nvptx[static])\"; "
+        + "LIBS=\"$SRCDIR/$(location :culinux_nvptx_alias[static_pic]) $SRCDIR/$(location //stage1:std__nvptx[static]) $SRCDIR/$(location //stage1:alloc__nvptx[static]) $SRCDIR/$(location //stage1:core__nvptx[static]) $SRCDIR/$(location //stage1:compiler_builtins__nvptx[static]) $SRCDIR/$(location //stage1:panic_abort__nvptx[static]) $SRCDIR/$(location :libc_hostcall_nvptx[static])\"; "
         + "cd \"$TMP\"; for R in $LIBS; do ar x \"$R\"; done; "
         + "OBJS=`ls *.o 2>/dev/null || true`; "
         + "if [ -z \"$OBJS\" ]; then echo \"no object files\" >&2; exit 1; fi; "
@@ -115,16 +122,27 @@ transition_alias(
 
 # Small Rust wrapper to embed the generated PTX directly into the host binary.
 native.genrule(
-    name = "culinux_ptx_rs",
+    name = "culinux_ptx_rs_v2",
     srcs = [":culinux_ptx"],
     out = "culinux_ptx.rs",
-    cmd = "echo 'pub static PTX: &[u8] = include_bytes!(\"$(location :culinux_ptx)\");' > \"$OUT\"",
+    # Include a content hash so changes in the PTX always force recompilation of the host wrapper/binary.
+    cmd = "python3 - <<'PY'\n"
+        + "from pathlib import Path\n"
+        + "import hashlib, os\n"
+        + "ptx = Path('$(location :culinux_ptx)')\n"
+        + "sha = hashlib.sha256(ptx.read_bytes()).hexdigest()\n"
+        + "out = Path(os.environ['OUT'])\n"
+        + "out.write_text(\n"
+        + "    f'pub const PTX_SHA256: &str = \"{sha}\";\\n'\n"
+        + "    f'pub static PTX: &[u8] = include_bytes!(\"{ptx}\");\\n'\n"
+        + ")\n"
+        + "PY",
     visibility = ["PUBLIC"],
 )
 
 rust_bootstrap_library(
     name = "culinux_ptx_rs_lib",
-    srcs = [":culinux_ptx_rs"],
+    srcs = [":culinux_ptx_rs_v2"],
     crate = "culinux_ptx_rs",
     crate_root = "culinux_ptx.rs",
     edition = "2024",
