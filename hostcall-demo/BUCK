@@ -123,11 +123,17 @@ transition_alias(
 )
 
 # Small Rust wrapper to embed the generated PTX directly into the host binary.
+# Include the PTX hash so this target (and crates consuming it) rebuild when the PTX changes.
 native.genrule(
     name = "culinux_ptx_rs_v2",
     srcs = [":culinux_ptx"],
     out = "culinux_ptx.rs",
-    cmd = "echo 'pub static PTX: &[u8] = include_bytes!(\"$(location :culinux_ptx)\");' > \"$OUT\"",
+    cmd = "PTX=$(location :culinux_ptx); "
+        + "HASH=`sha256sum \"$PTX\" | cut -d\" \" -f1`; "
+        + "cat > \"$OUT\" <<EOF\n"
+        + "pub static PTX: &[u8] = include_bytes!(\"$PTX\");\n"
+        + "pub const PTX_HASH: &str = \"$HASH\";\n"
+        + "EOF",
     visibility = ["PUBLIC"],
 )
 

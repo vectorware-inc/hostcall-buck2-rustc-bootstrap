@@ -15,7 +15,7 @@ pub extern "gpu-kernel" fn kernel_main() {
         .write_all(msg.as_bytes())
         .unwrap();
     // Second write to confirm kernel continues normally without exit.
-    std::fs::File::create("rust_from_gpu6.txt")
+    std::fs::File::create("rust_from_gpu2.txt")
         .unwrap()
         .write_all(msg.as_bytes())
         .unwrap();
