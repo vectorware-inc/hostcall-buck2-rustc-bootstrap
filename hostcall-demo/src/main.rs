@@ -185,32 +185,30 @@ fn main() {
     unsafe { launch!(module.kernel_main<<<1,1,0,stream>>>() ) }.unwrap();
 
     let start_time = std::time::Instant::now();
-    if debug {
-        for poll in 0..5 {
+    let max_polls = 1_000_000;
+    let mut polls = 0;
+    loop {
+        std::thread::sleep(Duration::from_nanos(100 as u64));
+        std::thread::yield_now();
+        runtime.pool_commands().unwrap();
+        polls += 1;
+        let done = unsafe {
+            cust::sys::cuStreamQuery(stream.as_inner()) == cust::sys::CUresult::CUDA_SUCCESS
+        };
+        if done || polls >= max_polls {
+            break;
+        }
+        if debug && polls % 5_000 == 0 {
             let buff_ptr = read_symbol_u64(&module, "__HOSTCALL_BUFF_PTR__", 1)[0];
             let buff_size = read_symbol_u64(&module, "__HOSTCALL_BUFF_SIZE__", 1)[0] as usize;
             let top = read_symbol_u64(&module, "__HOSTCALL_BUFF_TOP__", 1)[0];
             let words = if buff_size == 0 { 8 } else { buff_size.min(16) };
             let buff = read_buffer_words(&module, buff_ptr, words);
             eprintln!(
-                "[hostcall-debug] poll {poll}: ptr {buff_ptr} size {buff_size} top {top} head {:?}",
+                "[hostcall-debug] poll {polls}: ptr {buff_ptr} size {buff_size} top {top} head {:?}",
                 &buff[..words.min(buff.len())]
             );
-            std::thread::sleep(Duration::from_millis(10));
         }
-        eprintln!("[hostcall-debug] running a single runtime poll");
-        runtime.pool_commands().unwrap();
-        eprintln!(
-            "[hostcall-debug] return slots after poll {:?}",
-            read_symbol_u64(&module, "__HOSTCALL_RETURN_SLOTS__", 4)
-        );
-    }
-    let mut polls = 0;
-    for _ in 0..1_000_000 {
-        std::thread::sleep(Duration::from_nanos(100 as u64));
-        std::thread::yield_now();
-        runtime.pool_commands().unwrap();
-        polls += 1;
     }
     stream.synchronize().unwrap();
     eprintln!("{} ns (polled {polls} times)", start_time.elapsed().as_micros())

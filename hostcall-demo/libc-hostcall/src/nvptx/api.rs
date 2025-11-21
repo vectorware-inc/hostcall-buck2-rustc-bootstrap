@@ -352,3 +352,34 @@ pub static __HOSTCALL__write: AtomicU64 = AtomicU64::new(u64::MAX);
 #[unsafe(no_mangle)]
 #[used]
 pub static __HOSTCALL__open: AtomicU64 = AtomicU64::new(u64::MAX);
+#[unsafe(no_mangle)]
+#[used]
+pub static __HOSTCALL__exit: AtomicU64 = AtomicU64::new(u64::MAX);
+
+/// Request the host to exit; blocks until acknowledged.
+pub fn host_exit(code: i32) {
+    let return_slot = acquire_return_slot();
+    let mut data = [code as u64];
+    submit_hostcall(
+        __HOSTCALL__exit.load(Ordering::Relaxed) as u32,
+        return_slot,
+        &raw mut data as *const (),
+        8,
+    )
+    .unwrap();
+    while pool_return_slot(return_slot) == 0 {
+        sleep_ns_kernel(1000_0000);
+    }
+    free_return_slot(return_slot);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn _exit(status: c_int) -> ! {
+    host_exit(status);
+    unsafe { core::arch::nvptx::trap() }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn exit(status: c_int) -> ! {
+    _exit(status)
+}
