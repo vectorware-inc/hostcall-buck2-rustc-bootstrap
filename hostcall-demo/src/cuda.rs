@@ -10,8 +10,10 @@ use cust::{
     launch,
     memory::{AsyncCopyDestination, CopyDestination, DevicePointer, DeviceSlice},
     module::{Module, Symbol},
+    sys,
     stream::{Stream, StreamFlags},
 };
+use cust::sys::CUresult::CUDA_SUCCESS;
 
 use crate::runtime::{DevicePtr, GPUModule, Runtime};
 // We use a single stream for all the copies. Why?
@@ -62,6 +64,32 @@ impl GPUModule for Arc<cust::module::Module> {
         // Some sanity checks
         assert_eq!(offset % (size_of::<u64>() as u64), 0);
         // If this line panics, that is a result of an over-zealous `cust` check, that panics in perfectly safe code.
+        if name == "__HOSTCALL_RETURN_SLOTS__" {
+            // Manually copy with the driver API to avoid any cust size checks or type mismatches.
+            let sym: Result<Symbol<[u64; 64]>, CudaError> =
+                self.get_global(&CString::new(name).unwrap());
+            let sym = match sym {
+                Ok(sym) => sym,
+                Err(CudaError::NotFound) => return Ok(false),
+                Err(_) => sym.unwrap(),
+            };
+            let ptr: DevicePointer<[u64; 64]> = unsafe { std::mem::transmute(sym) };
+            let raw = ptr.as_raw() + offset;
+            let status = unsafe {
+                sys::cuMemcpyHtoDAsync_v2(
+                    raw,
+                    &value as *const _ as *const _,
+                    8,
+                    COPY_STREAM.as_inner(),
+                )
+            };
+            if status != CUDA_SUCCESS {
+                return Err(CudaError::IllegalAddress);
+            }
+            COPY_STREAM.synchronize()?;
+            return Ok(true);
+        }
+
         let sym: Result<Symbol<DevicePointer<u64>>, CudaError> =
             self.get_global(&CString::new(name).unwrap());
         let sym = match sym {
@@ -69,7 +97,6 @@ impl GPUModule for Arc<cust::module::Module> {
             Err(CudaError::NotFound) => return Ok(false),
             Err(_) => sym.unwrap(),
         };
-        eprintln!("Found {name:?}");
         let ptr: DevicePointer<u64> = unsafe { std::mem::transmute(sym) };
         let ptr = unsafe { ptr.add((offset as isize / 8).try_into().unwrap()) };
         let mut slice = unsafe { DeviceSlice::from_raw_parts(ptr, 1) };
@@ -119,7 +146,8 @@ impl GPUModule for Arc<cust::module::Module> {
     }
 
     fn free(&mut self, ptr: Self::DevicePtr) -> Result<(), Self::Error> {
-        unsafe { cust::memory::cuda_free(ptr) }
+        unsafe { cust::memory::cuda_free_async(&*COPY_STREAM, ptr) }?;
+        COPY_STREAM.synchronize()
     }
 }
 #[repr(C)]

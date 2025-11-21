@@ -272,7 +272,26 @@ pub extern "C" fn malloc(size: usize) -> *mut c_void {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn free(ptr: *mut c_void) {
-   
+    let return_slot = acquire_return_slot();
+    let mut data = [ptr as u64];
+    submit_hostcall(
+        __HOSTCALL__device_free.load(Ordering::Relaxed) as u32,
+        return_slot,
+        &raw mut data as *const (),
+        8,
+    )
+    .unwrap();
+    while pool_return_slot(return_slot) == 0 {
+        sleep_ns_kernel(1000_0000);
+        let mut fmt = [0];
+        unsafe {
+            vprintf(
+                c"Waiting for `free` hostcall to finish\n".as_ptr() as *const _,
+                &raw mut fmt as *const _,
+            )
+        };
+    }
+    free_return_slot(return_slot);
 }
 
 #[unsafe(no_mangle)]
@@ -323,6 +342,9 @@ pub unsafe extern "C" fn gettid() -> u32 {
 #[unsafe(no_mangle)]
 #[used]
 pub static __HOSTCALL__device_malloc: AtomicU64 = AtomicU64::new(u64::MAX);
+#[unsafe(no_mangle)]
+#[used]
+pub static __HOSTCALL__device_free: AtomicU64 = AtomicU64::new(u64::MAX);
 #[unsafe(no_mangle)]
 #[used]
 pub static __HOSTCALL__write: AtomicU64 = AtomicU64::new(u64::MAX);

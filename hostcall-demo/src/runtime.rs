@@ -19,23 +19,30 @@ pub struct Runtime<G: GPUModule> {
 impl<G: GPUModule> Drop for Runtime<G> {
     fn drop(&mut self) {
         for res in 0..64 {
-            self.gpu
+            if let Err(err) = self
+                .gpu
                 .write_u64_to_symbol("__HOSTCALL_RETURN_SLOTS__", 0xDEAD_BEEF, res * 8)
-                .unwrap();
+            {
+                eprintln!(
+                    "[hostcall] failed to reset return slot {res}: {err:?}, skipping the rest"
+                );
+                break;
+            }
         }
     }
 }
 impl<G: GPUModule> Runtime<G> {
     pub fn new(mut gpu: G) -> Result<Self, G::Error> {
         let buffers = [gpu.alloc(4096).unwrap(), gpu.alloc(4096).unwrap()];
-        gpu.write_pointer_to_symbol("__HOSTCALL_BUFF_PTR__", buffers[0])
-            .unwrap();
-        gpu.write_u64_to_symbol(
+        gpu.write_pointer_to_symbol("__HOSTCALL_BUFF_PTR__", buffers[0])?;
+        let wrote_size = gpu.write_u64_to_symbol(
             "__HOSTCALL_BUFF_SIZE__",
             (4096 / size_of::<u64>()) as u64,
             0,
-        )
-        .unwrap();
+        )?;
+        if !wrote_size {
+            eprintln!("[hostcall] failed to write __HOSTCALL_BUFF_SIZE__");
+        }
         gpu.write_u64_to_symbol("__HOSTCALL_BUFF_TOP__", 0, 0)
             .unwrap();
         Ok(Self {
@@ -57,34 +64,60 @@ impl<G: GPUModule> Runtime<G> {
         Ok(())
     }
     fn pool_cmdbuffer(&mut self, buff: &mut Vec<u64>) -> Result<(), G::Error> {
-        //eprintln!("Reading {:?}", self.buffers[0]);
+        // Read the buffer the GPU just filled.
         self.gpu
             .read_u64_slice(self.buffers[0], 4096 / size_of::<u64>(), buff)?;
+        // Prepare the alternate buffer for the next round.
         self.gpu.write_bytes_to_addr(&[0; 4096], self.buffers[1])?;
         self.gpu
             .write_pointer_to_symbol("__HOSTCALL_BUFF_PTR__", self.buffers[1])?;
-        self.gpu
-            .write_u64_to_symbol("__HOSTCALL_BUFF_TOP__", 0, 0)?;
+        let wrote_top = self.gpu.write_u64_to_symbol("__HOSTCALL_BUFF_TOP__", 0, 0)?;
+        if !wrote_top {
+            eprintln!("[hostcall] failed to write __HOSTCALL_BUFF_TOP__");
+        }
+        // Swap so the GPU writes into buffers[0] next and we read the other slot.
         self.buffers = [self.buffers[1], self.buffers[0]];
         Ok(())
     }
     pub fn pool_commands(&mut self) -> Result<(), G::Error> {
         let mut buff = Vec::new();
         self.pool_cmdbuffer(&mut buff).unwrap();
+        if buff.iter().any(|&w| w != 0) {
+            eprintln!("[hostcall] command buffer head: {:?}", &buff[..4.min(buff.len())]);
+        }
         let cmds = parse_commands(&mut &buff[..]);
+        if !cmds.is_empty() {
+            let summary: Vec<(u32, u16, u16)> = cmds
+                .iter()
+                .map(|c| (c.cmd, c.len, c.res))
+                .collect();
+            eprintln!("[hostcall] parsed cmds: {summary:?}");
+        }
         //eprintln!("Preparing to exec hostcalls: {cmds:?} {buff:?}");
         for cmd in cmds {
             //eprintln!("cmd:{cmd:?}");
             let Some((sym, handler)) = self.host_calls.get_mut(cmd.cmd as usize - 1) else {
                 eprintln!("Unsupported hostcall {cmd:?}");
-                self.gpu
+                let wrote = self
+                    .gpu
                     .write_u64_to_symbol("__HOSTCALL_RETURN_SLOTS__", 1, cmd.res as u64 * 8)?;
+                if !wrote {
+                    eprintln!("[hostcall] failed to write return slot for unsupported call");
+                }
                 continue;
             };
             //eprintln!("Executing hostcall {sym:?}");
             let res = handler.process(&mut self.gpu, &cmd.data);
-            self.gpu
+            let wrote = self
+                .gpu
                 .write_u64_to_symbol("__HOSTCALL_RETURN_SLOTS__", res, cmd.res as u64 * 8)?;
+            if !wrote {
+                eprintln!(
+                    "[hostcall] failed to write return slot {} for {sym}",
+                    cmd.res
+                );
+            }
+            eprintln!("[hostcall] completed {sym} -> {res} (slot {})", cmd.res);
         }
         Ok(())
     }

@@ -82,20 +82,26 @@ native.genrule(
     srcs = [
         ":culinux_nvptx[static_pic]",
         "//stage0:ci_llvm",
+        "//stage1:std__nvptx[static]",
+        "//stage1:alloc__nvptx[static]",
+        "//stage1:core__nvptx[static]",
+        "//stage1:compiler_builtins__nvptx[static]",
+        "//stage1:panic_abort__nvptx[static]",
+        ":libc_hostcall_nvptx[static]",
     ],
     default_target_platform = "//platforms/nvptx:library",
     target_compatible_with = [],
     out = "libculinux.ptx",
     cmd = "bash -c 'set -euo pipefail; TMP=/tmp/culinux-$$; rm -rf \"$TMP\"; mkdir -p \"$TMP\"; trap \"rm -rf $TMP\" EXIT; "
-        + "OUT=\"$PWD/$OUT\"; for RLIB in LPPL/libculinux-*.rlib; do RLIB=\"$PWD/$RLIB\"; break; done; LLVM_DIR=\"$PWD/ci-llvm\"; "
-        + "cd \"$TMP\"; ar x \"$RLIB\"; "
+        + "SRCDIR=\"$PWD\"; OUT=\"$PWD/$OUT\"; LLVM_DIR=\"$PWD/ci-llvm\"; "
+        + "LIBS=\"$SRCDIR/$(location :culinux_nvptx[static_pic]) $SRCDIR/$(location //stage1:std__nvptx[static]) $SRCDIR/$(location //stage1:alloc__nvptx[static]) $SRCDIR/$(location //stage1:core__nvptx[static]) $SRCDIR/$(location //stage1:compiler_builtins__nvptx[static]) $SRCDIR/$(location //stage1:panic_abort__nvptx[static]) $SRCDIR/$(location :libc_hostcall_nvptx[static])\"; "
+        + "cd \"$TMP\"; for R in $LIBS; do ar x \"$R\"; done; "
         + "OBJS=`ls *.o 2>/dev/null || true`; "
-        + "if [ -z \"$OBJS\" ]; then echo \"no object files in $RLIB\" >&2; exit 1; fi; "
+        + "if [ -z \"$OBJS\" ]; then echo \"no object files\" >&2; exit 1; fi; "
         + "\"$LLVM_DIR\"/bin/llvm-link $OBJS -o culinux.bc; "
-        + "\"$LLVM_DIR\"/bin/opt -passes=internalize,globaldce culinux.bc -o culinux.opt.bc; "
-        + "\"$LLVM_DIR\"/bin/opt -O1 culinux.opt.bc -o culinux.opt.bc; "
-        + "\"$LLVM_DIR\"/bin/llc -mcpu=sm_89 culinux.opt.bc -o \"$OUT\"; "
-        + "sed -i \"s/sm_75/sm_89/g\" \"$OUT\"' ",
+        + "\"$LLVM_DIR\"/bin/opt -passes=internalize,globaldce -internalize-public-api-list=kernel_main culinux.bc -o culinux.opt.bc; "
+        + "\"$LLVM_DIR\"/bin/opt -O2 culinux.opt.bc -o culinux.opt.bc; "
+        + "\"$LLVM_DIR\"/bin/llc -mcpu=sm_89 culinux.opt.bc -o \"$OUT\"' ",
     visibility = ["PUBLIC"],
 )
 

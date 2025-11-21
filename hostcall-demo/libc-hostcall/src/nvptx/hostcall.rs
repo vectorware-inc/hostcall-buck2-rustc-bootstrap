@@ -57,6 +57,18 @@ pub fn submit_hostcall(cmd: u32, res: u16, cmd_data: *const (), len: u16) -> Res
 
         return Err(());
     }
+    {
+        let mut fmt = [0_u32; 3];
+        fmt[0] = cmd;
+        fmt[1] = len as u32;
+        fmt[2] = offset as u32;
+        unsafe {
+            vprintf(
+                c"submit cmd %u len %u off %u\n".as_ptr() as *const _,
+                &raw mut fmt as *const _,
+            )
+        };
+    }
     let hostcall_buff_ptr = __HOSTCALL_BUFF_PTR__.load(Ordering::Relaxed);
 
     let cmd_ptr: &mut CommandHeader =
