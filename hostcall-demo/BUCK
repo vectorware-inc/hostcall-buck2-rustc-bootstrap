@@ -125,18 +125,7 @@ native.genrule(
     name = "culinux_ptx_rs_v2",
     srcs = [":culinux_ptx"],
     out = "culinux_ptx.rs",
-    # Include a content hash so changes in the PTX always force recompilation of the host wrapper/binary.
-    cmd = "python3 - <<'PY'\n"
-        + "from pathlib import Path\n"
-        + "import hashlib, os\n"
-        + "ptx = Path('$(location :culinux_ptx)')\n"
-        + "sha = hashlib.sha256(ptx.read_bytes()).hexdigest()\n"
-        + "out = Path(os.environ['OUT'])\n"
-        + "out.write_text(\n"
-        + "    f'pub const PTX_SHA256: &str = \"{sha}\";\\n'\n"
-        + "    f'pub static PTX: &[u8] = include_bytes!(\"{ptx}\");\\n'\n"
-        + ")\n"
-        + "PY",
+    cmd = "echo 'pub static PTX: &[u8] = include_bytes!(\"$(location :culinux_ptx)\");' > \"$OUT\"",
     visibility = ["PUBLIC"],
 )
 
