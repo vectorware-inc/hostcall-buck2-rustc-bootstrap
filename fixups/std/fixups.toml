@@ -31,7 +31,10 @@ rustc_flags = [
     "target_os=\"none\"",
 ]
 rustc_env = { RUST_TARGET_PATH = "$(location //target_specs:nvptx64-vectorware-target-dir)" }
-extra_deps = ["//hostcall-demo:libc_hostcall_nvptx"]
+extra_deps = [
+    "//hostcall-demo:libc_hostcall_nvptx",
+    "//target_specs:nvptx64-vectorware-target-dir",
+]
 extra_srcs = [
     "fixups/std/nvptx_vectorware.rs",
     "fixups/std/sys/pal/unsupported/mod.rs",

@@ -63,15 +63,17 @@ This repository now exposes native Buck2 targets that cover the demo end to end:
 
 - `buck2 build //hostcall-demo:hostcalls_bin` – builds the host runtime against the
   locally vendored third-party crates produced via `reindeer`.
-- `buck2 build //hostcall-demo:culinux_ptx` – reproduces the old `build.sh` flow inside
-  a deterministic genrule. The rule invokes `cargo +nightly build -Zbuild-std`, performs
-  the `llvm-link/opt/llc` pipeline, and emits `libculinux.ptx` into `buck-out`.
-- `buck2 run //hostcall-demo:hostcalls_bin` – the binary now depends on the PTX target
-  and embeds its path at compile time, so invoking it via Buck automatically runs the
-  full hostcall demo.
+- `buck2 build //hostcall-demo:culinux_ptx` – stitches together the nvptx static
+  archives (`std`, `alloc`, `core`, `panic_abort`, and `libc-hostcall`), links them
+  into bitcode with `llvm-link` from `//stage0:ci_llvm`, runs a small `opt` pipeline,
+  and emits a PTX module.
+- `buck2 run //hostcall-demo:hostcalls_bin` – the binary depends on the PTX target and
+  embeds its hash/path at compile time, so invoking it via Buck automatically runs the
+  full hostcall demo end to end.
 
-The kernel build expects a `nightly` toolchain with `-Zbuild-std` enabled as well as
-the LLVM utilities `llvm-link`, `opt`, `llvm-dis`, and `llc` in `PATH`.
+The PTX rule relies on the vendored `ci-llvm` toolchain plus the nvptx sysroot this
+repository produces; no external nightly toolchain or `build.sh` invocation is needed.
+`hostcall-demo/culinux/build.sh` remains only as a reference for the old flow.
 
 # Inner workings 
 ## Command buffer

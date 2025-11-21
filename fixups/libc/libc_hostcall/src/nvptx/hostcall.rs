@@ -15,6 +15,10 @@ pub static __HOSTCALL_BUFF_TOP__: AtomicUsize = AtomicUsize::new(0);
 #[unsafe(no_mangle)]
 #[used]
 pub static __HOSTCALL_RETURN_SLOTS__: [AtomicU64; 64] = [const { AtomicU64::new(0) }; 64];
+
+// TODO: grow this into a real allocator; the demo currently hardcodes a single
+// return slot to keep the GPU/host ABI surface minimal while the plumbing
+// stabilizes.
 pub fn acquire_return_slot() -> u16 {
     let idx = 1;
     __HOSTCALL_RETURN_SLOTS__[idx].store(0, Ordering::Relaxed);

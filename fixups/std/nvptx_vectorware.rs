@@ -1,6 +1,10 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
+// Minimal std facade for the custom nvptx target. We wire the allocator symbols
+// into libc-hostcall so kernel code can call into host-managed allocation and
+// logging primitives without pulling in the full std stack.
+
 extern crate alloc;
 use libc_hostcall::{free, malloc};
 use core::panic::PanicInfo;

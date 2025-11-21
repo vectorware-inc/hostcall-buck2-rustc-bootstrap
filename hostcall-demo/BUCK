@@ -16,7 +16,7 @@ rust_bootstrap_library(
 
 rust_bootstrap_library(
     name = "libc_hostcall",
-    srcs = [],  # placeholder; see nvptx-specific rule below
+    srcs = glob(["libc-hostcall/src/**/*.rs"]),
     crate = "libc_hostcall",
     crate_root = "libc-hostcall/src/lib.rs",
     edition = "2024",
@@ -24,16 +24,15 @@ rust_bootstrap_library(
 )
 
 # NVPTX build of libc_hostcall forcing the nvptx toolchain and platform.
-native.rust_library(
+rust_bootstrap_library(
     name = "libc_hostcall_nvptx",
     crate = "libc_hostcall",
     crate_root = "libc-hostcall/src/lib.rs",
     srcs = glob(["libc-hostcall/src/**/*.rs"]),
     edition = "2024",
     visibility = ["PUBLIC"],
-    default_target_platform = "//platforms/nvptx:library",
+    target_compatible_with = ["//constraints:target=nvptx64"],
     resources = ["//target_specs:nvptx64-vectorware-target-dir"],
-    env = {"RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-target-dir)"},
     deps = [
         "//:alloc",
         "//:core",
@@ -88,6 +87,8 @@ rust_bootstrap_binary(
 
 native.genrule(
     name = "culinux_ptx_raw",
+    # Flatten all the nvptx static archives (std, alloc, libc hostcall, kernel)
+    # into LLVM bitcode and then lower to PTX with the ci-llvm toolchain.
     srcs = [
         ":culinux_nvptx_alias[static_pic]",
         "//stage0:ci_llvm",
@@ -103,7 +104,7 @@ native.genrule(
     target_compatible_with = ["//constraints:target=nvptx64"],
     out = "libculinux.ptx",
     cmd = "bash -c 'set -euo pipefail; TMP=/tmp/culinux-$$; rm -rf \"$TMP\"; mkdir -p \"$TMP\"; trap \"rm -rf $TMP\" EXIT; "
-        + "SRCDIR=\"$PWD\"; OUT=\"$PWD/$OUT\"; LLVM_DIR=\"$PWD/ci-llvm\"; "
+        + "SRCDIR=\"$PWD\"; OUT=\"$PWD/$OUT\"; LLVM_DIR=\"$SRCDIR/ci-llvm\"; "
         + "LIBS=\"$SRCDIR/$(location :culinux_nvptx_alias[static_pic]) $SRCDIR/$(location //stage1:std__nvptx[static]) $SRCDIR/$(location //stage1:alloc__nvptx[static]) $SRCDIR/$(location //stage1:core__nvptx[static]) $SRCDIR/$(location //stage1:compiler_builtins__nvptx[static]) $SRCDIR/$(location //stage1:panic_abort__nvptx[static]) $SRCDIR/$(location :libc_hostcall_nvptx[static])\"; "
         + "cd \"$TMP\"; for R in $LIBS; do ar x \"$R\"; done; "
         + "OBJS=`ls *.o 2>/dev/null || true`; "
