@@ -1,10 +1,14 @@
-#![feature(abi_gpu_kernel, asm_experimental_arch, stdarch_nvptx)]
+#![no_std]
+#![feature(abi_gpu_kernel, asm_experimental_arch, stdarch_nvptx, rustc_private)]
 
-#[allow(unused_extern_crates)]
-extern crate libc_hostcall as _libc_hostcall;
+extern crate std;
+
+use std::borrow::ToOwned;
+use std::format;
+use std::io::Write;
+
 #[unsafe(no_mangle)]
 pub extern "gpu-kernel" fn kernel_main() {
-    use std::io::Write;
     let msg = format!("This file was created *from a GPU*, using the Rust standard library :D\n We are {:?}", "VectorWare".to_owned());
     std::fs::File::create("rust_from_gpu.txt").unwrap().write_all(msg.as_bytes()).unwrap();
 }

@@ -1,0 +1,9 @@
+['cfg(all(target_arch = "nvptx64", target_vendor = "vectorware"))']
+# Replace unwind with a minimal no_std stub for nvptx.
+crate = "unwind"
+crate_root = "fixups/unwind/nvptx_stub.rs"
+extra_srcs = ["fixups/unwind/nvptx_stub.rs"]
+_rust_toolchain = "toolchains//:rust_nvptx"
+default_target_platform = "//platforms/nvptx:library"
+labels = ["generated"]
+srcs = ["fixups/unwind/nvptx_stub.rs"]

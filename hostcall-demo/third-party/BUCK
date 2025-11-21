@@ -333,6 +333,14 @@ rust_bootstrap_buildscript_run(
     name = "libm-0.2.15-build-script-run",
     package_name = "libm",
     buildscript_rule = ":libm-0.2.15-build-script-build",
+    env = {
+        "OPT_LEVEL": "3",
+        "CARGO_CFG_TARGET_ARCH": "aarch64",
+        "CARGO_CFG_TARGET_ENV": "gnu",
+        "CARGO_CFG_TARGET_OS": "linux",
+        "CARGO_CFG_TARGET_VENDOR": "unknown",
+        "CARGO_CFG_TARGET_FAMILY": "unix",
+    },
     features = [
         "arch",
         "default",

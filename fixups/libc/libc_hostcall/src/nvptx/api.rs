@@ -1,6 +1,8 @@
-use alloc::ffi::CString;
+extern crate alloc;
+
+use alloc::borrow::ToOwned;
 use core::arch::nvptx::*;
-use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void, CStr};
+use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use super::hostcall::{
@@ -135,8 +137,7 @@ struct FileOpen{
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn open64(path: *const c_char, flags: c_int, mode: c_ulong) -> c_int {
-    use std::ffi::CStr;
-    let cstr = unsafe { CStr::from_ptr(path).to_owned() };
+    let cstr = unsafe { core::ffi::CStr::from_ptr(path).to_owned() };
     
 let fw = FileOpen{ptr:cstr.as_ptr() as usize as u64, len:cstr.count_bytes() as u64, flags:flags as u32,mode: mode as u32};
     let return_slot = acquire_return_slot();

@@ -34,7 +34,12 @@ rust_tool(
     exe = "//:rustc-main-rustc-main",
     incoming_transition = "//platforms/stage1:compiler",
     llvm = "//stage0:ci_llvm",
-    visibility = ["toolchains//:rust"],
+    visibility = [
+        "toolchains//:rust",
+        "toolchains//:rust_nvptx",
+        "toolchains//:rust_nvptx_sysroot",
+        "toolchains//:rust_nvptx_full",
+    ],
 )
 
 rust_tool(
@@ -42,7 +47,12 @@ rust_tool(
     exe = "//:rustdoc-tool-rustdoc_tool_binary",
     incoming_transition = "//platforms/stage1:compiler",
     llvm = "//stage0:ci_llvm",
-    visibility = ["toolchains//:rust"],
+    visibility = [
+        "toolchains//:rust",
+        "toolchains//:rust_nvptx",
+        "toolchains//:rust_nvptx_sysroot",
+        "toolchains//:rust_nvptx_full",
+    ],
 )
 
 rust_tool(
@@ -50,7 +60,12 @@ rust_tool(
     exe = "//:clippy-clippy-driver",
     incoming_transition = "//platforms/stage1:compiler",
     llvm = "//stage0:ci_llvm",
-    visibility = ["toolchains//:rust"],
+    visibility = [
+        "toolchains//:rust",
+        "toolchains//:rust_nvptx",
+        "toolchains//:rust_nvptx_sysroot",
+        "toolchains//:rust_nvptx_full",
+    ],
 )
 
 sysroot(
@@ -66,7 +81,27 @@ sysroot(
     incoming_transition = "//platforms/nvptx:library",
     rust_toolchain = "toolchains//:rust_nvptx",
     visibility = ["PUBLIC"],
-    deps = [":{}__nvptx".format(crate) for crate in SYSROOT_CRATES],
+    # Minimal nvptx sysroot: core/alloc/compiler_builtins/panic_abort/std only.
+    deps = [
+        ":core__nvptx",
+        ":alloc__nvptx",
+        ":compiler_builtins__nvptx",
+        ":panic_abort__nvptx",
+        ":std__nvptx",
+    ],
+)
+
+sysroot(
+    name = "sysroot_nvptx_seed",
+    incoming_transition = "//platforms/nvptx:library",
+    rust_toolchain = "toolchains//:rust_nvptx",
+    visibility = ["PUBLIC"],
+    deps = [
+        ":alloc__nvptx",
+        ":compiler_builtins__nvptx",
+        ":core__nvptx",
+        ":panic_abort__nvptx",
+    ],
 )
 
 rust_dist(

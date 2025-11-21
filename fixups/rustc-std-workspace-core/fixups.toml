@@ -1,0 +1,3 @@
+['cfg(all(target_arch = "nvptx64", target_vendor = "vectorware"))']
+# Ensure Buck copies sources for nvptx std workspace glue so __srcs exists.
+labels = ["generated"]

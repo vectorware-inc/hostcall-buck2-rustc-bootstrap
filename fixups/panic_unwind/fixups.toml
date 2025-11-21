@@ -1,0 +1,9 @@
+['cfg(all(target_arch = "nvptx64", target_vendor = "vectorware"))']
+# Stub out panic_unwind for nvptx; we use panic=abort.
+crate = "panic_unwind"
+crate_root = "fixups/panic_unwind/nvptx_stub.rs"
+extra_srcs = ["fixups/panic_unwind/nvptx_stub.rs"]
+_rust_toolchain = "toolchains//:rust_nvptx"
+default_target_platform = "//platforms/nvptx:library"
+labels = ["generated"]
+srcs = ["fixups/panic_unwind/nvptx_stub.rs"]

@@ -1,8 +1,5 @@
-load(
-    "//:defs.bzl",
-    "rust_bootstrap_binary",
-    "rust_bootstrap_library",
-)
+load("//:defs.bzl", "rust_bootstrap_binary", "rust_bootstrap_library")
+load("//constraints:defs.bzl", "transition_alias")
 
 rust_bootstrap_library(
     name = "hostcalls_lib",
@@ -35,52 +32,76 @@ native.rust_library(
     edition = "2024",
     visibility = ["PUBLIC"],
     default_target_platform = "//platforms/nvptx:library",
+    deps = [
+        "//:alloc",
+        "//:core",
+    ],
     _rust_toolchain = "toolchains//:rust_nvptx",
+)
+
+rust_bootstrap_library(
+    name = "culinux_nvptx",
+    srcs = glob(["culinux/src/**/*.rs"]),
+    crate = "culinux",
+    crate_root = "culinux/src/lib.rs",
+    edition = "2024",
+    preferred_linkage = "static",
+    resources = [
+        "//target_specs:nvptx64-vectorware-target-dir",
+    ],
+    target_compatible_with = [],
+    rustc_flags = [
+        "-Zunstable-options",
+        "-Cpanic=abort",
+    ],
+    deps = [
+        ":libc_hostcall_nvptx",
+        "//:alloc",
+    ],
+    _rust_toolchain = "toolchains//:rust_nvptx_full",
 )
 
 rust_bootstrap_binary(
     name = "hostcalls_bin",
     crate = "hostcalls",
     crate_root = "src/main.rs",
+    srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    rustc_flags = ["-Clink-arg=-lcuda"],
     visibility = ["PUBLIC"],
-    env = {
-        "HOSTCALL_PTX_PATH": "$(location :culinux_ptx)",
-    },
+    env = {},
     deps = [
         ":hostcalls_lib",
-        ":culinux_ptx",
+        "//hostcall-demo/third-party:cust",
     ],
 )
 
-# Legacy PTX build via Cargo/llvm toolchain until native PTX emission is wired.
+# Build PTX from the nvptx rlib using the bootstrap toolchain + bundled LLVM.
 native.genrule(
-    name = "culinux_ptx",
-    srcs = glob(
-        [
-            "culinux/**",
-            "libc-hostcall/**",
-        ],
-        exclude = [
-            "culinux/target/**",
-            "libc-hostcall/target/**",
-        ],
-    ),
+    name = "culinux_ptx_raw",
+    srcs = [
+        ":culinux_nvptx[static_pic]",
+        "//stage0:ci_llvm",
+    ],
+    default_target_platform = "//platforms/nvptx:library",
+    target_compatible_with = [],
     out = "libculinux.ptx",
-    cmd = "bash -c 'set -euo pipefail; TMP=$$(mktemp -d); trap \"rm -rf $$TMP\" EXIT; "
-        + "export CARGO_TARGET_DIR=\"$$TMP/cargo-target\"; "
-        + "export RUSTFLAGS=\"--cfg target_has_reliable_f128=false -C panic=abort -C linker-flavor=llbc -Z unstable-options -C target-feature=-crt-static -C link-args=-nostdlib -nostartfiles -nodefaultlibs\"; "
-        + "export RUSTC=$(exe //stage0:rustc); "
-        + "cd hostcall-demo/culinux; "
-        + "cargo +nightly build --release --target nvptx64-nvidia-linux.json -Z build-std=core,std,panic_abort; "
-        + "OBJ_DIR=\"$$TMP/objects\"; mkdir -p \"$$OBJ_DIR\"; "
-        + "( cd \"$$OBJ_DIR\" && ar x \"$$CARGO_TARGET_DIR/nvptx64-nvidia-linux/release/libculinux.a\" ); "
-        + "llvm-link $$OBJ_DIR/*.o -o \"$$TMP/libculinux.bc\"; "
-        + "llvm-dis \"$$TMP/libculinux.bc\" -o \"$$TMP/libculinux.ll\"; "
-        + "opt -passes=\\\"internalize,globaldce\\\" \"$$TMP/libculinux.bc\" -o \"$$TMP/libculinux.opt.bc\"; "
-        + "opt -O1 \"$$TMP/libculinux.opt.bc\" -o \"$$TMP/libculinux.opt.bc\"; "
-        + "llc -mcpu=sm_89 \"$$TMP/libculinux.opt.bc\" -o \"$$TMP/libculinux.ptx\"; "
-        + "sed -i \"s/sm_75/sm_89/g\" \"$$TMP/libculinux.ptx\"; "
-        + "cp \"$$TMP/libculinux.ptx\" \"$OUT\"' ",
+    cmd = "bash -c 'set -euo pipefail; TMP=/tmp/culinux-$$; rm -rf \"$TMP\"; mkdir -p \"$TMP\"; trap \"rm -rf $TMP\" EXIT; "
+        + "OUT=\"$PWD/$OUT\"; for RLIB in LPPL/libculinux-*.rlib; do RLIB=\"$PWD/$RLIB\"; break; done; LLVM_DIR=\"$PWD/ci-llvm\"; "
+        + "cd \"$TMP\"; ar x \"$RLIB\"; "
+        + "OBJS=`ls *.o 2>/dev/null || true`; "
+        + "if [ -z \"$OBJS\" ]; then echo \"no object files in $RLIB\" >&2; exit 1; fi; "
+        + "\"$LLVM_DIR\"/bin/llvm-link $OBJS -o culinux.bc; "
+        + "\"$LLVM_DIR\"/bin/opt -passes=internalize,globaldce culinux.bc -o culinux.opt.bc; "
+        + "\"$LLVM_DIR\"/bin/opt -O1 culinux.opt.bc -o culinux.opt.bc; "
+        + "\"$LLVM_DIR\"/bin/llc -mcpu=sm_89 culinux.opt.bc -o \"$OUT\"; "
+        + "sed -i \"s/sm_75/sm_89/g\" \"$OUT\"' ",
+    visibility = ["PUBLIC"],
+)
+
+transition_alias(
+    name = "culinux_ptx",
+    actual = ":culinux_ptx_raw",
+    incoming_transition = "//platforms/nvptx:library",
     visibility = ["PUBLIC"],
 )

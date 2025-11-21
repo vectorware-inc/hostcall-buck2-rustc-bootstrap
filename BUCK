@@ -4707,7 +4707,7 @@ rust_bootstrap_library(
     }),
     crate = "libc",
     crate_root = select({
-        "rust//constraints:target=nvptx64": "fixups/libc/libc_hostcall/lib.rs",
+        "rust//constraints:target=nvptx64": "fixups/libc/libc_hostcall/src/lib.rs",
         "DEFAULT": "libc-0.2.174.crate/src/lib.rs",
     }),
     edition = "2021",
@@ -4820,7 +4820,7 @@ rust_bootstrap_library(
                 ":rustc-std-workspace-core-1.99.0",
             ],
             env = {
-                "RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-linux.json)",
+                "RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-target-dir)",
             },
         ),
     },
@@ -6457,18 +6457,29 @@ rust_bootstrap_alias(
 
 rust_bootstrap_library(
     name = "panic_unwind-0.0.0",
-    srcs = [
-        "rust/library/panic_unwind/src/dummy.rs",
-        "rust/library/panic_unwind/src/emcc.rs",
-        "rust/library/panic_unwind/src/gcc.rs",
-        "rust/library/panic_unwind/src/hermit.rs",
-        "rust/library/panic_unwind/src/lib.rs",
-        "rust/library/panic_unwind/src/miri.rs",
-        "rust/library/panic_unwind/src/seh.rs",
-    ],
+    srcs = select({
+        "rust//constraints:target=nvptx64": [
+            "fixups/panic_unwind/nvptx_stub.rs",
+        ],
+        "DEFAULT": [
+            "rust/library/panic_unwind/src/dummy.rs",
+            "rust/library/panic_unwind/src/emcc.rs",
+            "rust/library/panic_unwind/src/gcc.rs",
+            "rust/library/panic_unwind/src/hermit.rs",
+            "rust/library/panic_unwind/src/lib.rs",
+            "rust/library/panic_unwind/src/miri.rs",
+            "rust/library/panic_unwind/src/seh.rs",
+        ],
+    }),
     crate = "panic_unwind",
-    crate_root = "rust/library/panic_unwind/src/lib.rs",
+    crate_root = select({
+        "rust//constraints:target=nvptx64": "fixups/panic_unwind/nvptx_stub.rs",
+        "DEFAULT": "rust/library/panic_unwind/src/lib.rs",
+    }),
     edition = "2024",
+    target_compatible_with = select({
+        "DEFAULT": [],
+    }),
     named_deps = {
         "core": ":rustc-std-workspace-core-1.99.0",
     },
@@ -11606,6 +11617,7 @@ rust_bootstrap_library(
         "rust/compiler/rustc_target/src/spec/targets/mipsisa64r6el_unknown_linux_gnuabi64.rs",
         "rust/compiler/rustc_target/src/spec/targets/msp430_none_elf.rs",
         "rust/compiler/rustc_target/src/spec/targets/nvptx64_nvidia_cuda.rs",
+        "rust/compiler/rustc_target/src/spec/targets/nvptx64_vectorware_linux.rs",
         "rust/compiler/rustc_target/src/spec/targets/powerpc64_ibm_aix.rs",
         "rust/compiler/rustc_target/src/spec/targets/powerpc64_unknown_freebsd.rs",
         "rust/compiler/rustc_target/src/spec/targets/powerpc64_unknown_linux_gnu.rs",
@@ -13295,9 +13307,13 @@ rust_bootstrap_alias(
 
 rust_bootstrap_library(
     name = "std-0.0.0",
-    srcs = [
-        "rust/library/backtrace/src/backtrace/libunwind.rs",
-        "rust/library/backtrace/src/backtrace/miri.rs",
+    srcs = select({
+        "rust//constraints:target=nvptx64": [
+            "fixups/std/nvptx_vectorware.rs",
+        ],
+        "DEFAULT": [
+            "rust/library/backtrace/src/backtrace/libunwind.rs",
+            "rust/library/backtrace/src/backtrace/miri.rs",
         "rust/library/backtrace/src/backtrace/mod.rs",
         "rust/library/backtrace/src/backtrace/noop.rs",
         "rust/library/backtrace/src/backtrace/win32.rs",
@@ -13972,17 +13988,25 @@ rust_bootstrap_library(
         "rust/library/std/src/time.rs",
         "rust/library/stdarch/crates/core_arch/src/core_arch_docs.md",
     ],
+    }),
     crate = "std",
-    crate_root = "rust/library/std/src/lib.rs",
+    crate_root = select({
+        "rust//constraints:target=nvptx64": "fixups/std/nvptx_vectorware.rs",
+        "DEFAULT": "rust/library/std/src/lib.rs",
+    }),
     edition = "2024",
-    env = {
-        "OUT_DIR": "$(location :std-0.0.0-build-script-run[out_dir])",
-    },
-    features = [
-        "backtrace",
-        "std_detect_dlsym_getauxval",
-        "std_detect_file_io",
-    ],
+    env = select({
+        "rust//constraints:target=nvptx64": {},
+        "DEFAULT": {"OUT_DIR": "$(location :std-0.0.0-build-script-run[out_dir])"},
+    }),
+    features = select({
+        "rust//constraints:target=nvptx64": [],
+        "DEFAULT": [
+            "backtrace",
+            "std_detect_dlsym_getauxval",
+            "std_detect_file_io",
+        ],
+    }),
     platform = {
         "linux-arm64-library": dict(
             features = [
@@ -14068,21 +14092,34 @@ rust_bootstrap_library(
         ),
     },
     preferred_linkage = "any",
-    rustc_flags = [
-        "-Zforce-unstable-if-unmarked",
-        "@$(location :std-0.0.0-build-script-run[rustc_flags])",
-    ],
+    rustc_flags = select({
+        "rust//constraints:target=nvptx64": [
+            "-Zforce-unstable-if-unmarked",
+            "-Cpanic=abort",
+        ],
+        "DEFAULT": [
+            "-Zforce-unstable-if-unmarked",
+            "@$(location :std-0.0.0-build-script-run[rustc_flags])",
+        ],
+    }),
     visibility = [],
-    deps = [
-        ":alloc-0.0.0",
-        ":cfg-if-1.0.4",
-        ":core-0.0.0",
-        ":hashbrown-0.15.5",
-        ":panic_unwind-0.0.0",
-        ":rustc-demangle-0.1.26",
-        ":std_detect-0.1.5",
-        ":unwind-0.0.0",
-    ],
+    deps = select({
+        "rust//constraints:target=nvptx64": [
+            ":alloc-0.0.0",
+            ":core-0.0.0",
+            "//hostcall-demo:libc_hostcall_nvptx",
+        ],
+        "DEFAULT": [
+            ":alloc-0.0.0",
+            ":cfg-if-1.0.4",
+            ":core-0.0.0",
+            ":hashbrown-0.15.5",
+            ":panic_unwind-0.0.0",
+            ":rustc-demangle-0.1.26",
+            ":std_detect-0.1.5",
+            ":unwind-0.0.0",
+        ],
+    }),
 )
 
 rust_bootstrap_binary(
@@ -16093,15 +16130,26 @@ rust_bootstrap_library(
 
 rust_bootstrap_library(
     name = "unwind-0.0.0",
-    srcs = [
-        "rust/library/unwind/src/lib.rs",
-        "rust/library/unwind/src/libunwind.rs",
-        "rust/library/unwind/src/unwinding.rs",
-        "rust/library/unwind/src/wasm.rs",
-    ],
+    srcs = select({
+        "rust//constraints:target=nvptx64": [
+            "fixups/unwind/nvptx_stub.rs",
+        ],
+        "DEFAULT": [
+            "rust/library/unwind/src/lib.rs",
+            "rust/library/unwind/src/libunwind.rs",
+            "rust/library/unwind/src/unwinding.rs",
+            "rust/library/unwind/src/wasm.rs",
+        ],
+    }),
     crate = "unwind",
-    crate_root = "rust/library/unwind/src/lib.rs",
+    crate_root = select({
+        "rust//constraints:target=nvptx64": "fixups/unwind/nvptx_stub.rs",
+        "DEFAULT": "rust/library/unwind/src/lib.rs",
+    }),
     edition = "2024",
+    target_compatible_with = select({
+        "DEFAULT": [],
+    }),
     named_deps = {
         "core": ":rustc-std-workspace-core-1.99.0",
     },
@@ -16122,6 +16170,9 @@ rust_bootstrap_library(
             deps = [":libc-0.2.174"],
         ),
         "windows-gnu-library": dict(
+            deps = [":libc-0.2.174"],
+        ),
+        "nvptx64-vectorware-library": dict(
             deps = [":libc-0.2.174"],
         ),
     },

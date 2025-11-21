@@ -21,7 +21,30 @@ def rust_bootstrap_binary(
         platform = {},
         rustc_flags = [],
         **kwargs):
+    extra_deps = []
+    extra_env = {}
     extra_rustc_flags = []
+    nvptx_toolchain = "toolchains//:rust_nvptx_sysroot"
+    if crate_root.startswith("rust/library/") or crate_root.startswith("rust/compiler/") or crate_root.startswith("rust/src/"):
+        nvptx_toolchain = "toolchains//:rust_nvptx"
+    rust_toolchain = select({
+        "rust//constraints:target=nvptx64": nvptx_toolchain,
+        "DEFAULT": "toolchains//:rust",
+    })
+    if nvptx_toolchain != "toolchains//:rust":
+        extra_deps.append("//target_specs:nvptx64-vectorware-target-dir")
+        extra_env["RUST_TARGET_PATH"] = "$(location //target_specs:nvptx64-vectorware-target-dir)"
+        extra_env["RUST_TARGET_PATH"] = "$(location //target_specs:nvptx64-vectorware-target-dir)"
+    for plat in [
+        "nvptx64-vectorware-compiler",
+        "nvptx64-vectorware-library",
+    ]:
+        env_override = platform.get(plat, {}).get("env", {})
+        platform = platform | {
+            plat: platform.get(plat, {}) | {
+                "env": {"RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-target-dir)"} | env_override,
+            },
+        }
 
     if crate_root.startswith("rust/library/"):
         default_target_platform = "//platforms/stage1:library-build-script"
@@ -38,7 +61,11 @@ def rust_bootstrap_binary(
         default_target_platform = default_target_platform,
         rustc_flags = rustc_flags + extra_rustc_flags,
         target_compatible_with = _target_constraints(crate_root),
-        **apply_platform_attrs(platform, kwargs)
+        **apply_platform_attrs(platform, kwargs | {
+            "_rust_toolchain": rust_toolchain,
+            "deps": kwargs.get("deps", []) + extra_deps,
+            "env": kwargs.get("env", {}) | extra_env if not is_select(kwargs.get("env", {})) else kwargs.get("env", {}) + extra_env,
+        })
     )
 
 def rust_bootstrap_library(
@@ -71,6 +98,26 @@ def rust_bootstrap_library(
     extra_env = {}
     extra_rustc_flags = []
     extra_srcs = []
+    nvptx_toolchain = "toolchains//:rust_nvptx_sysroot"
+    if hasattr(crate_root, "startswith") and (crate_root.startswith("rust/library/") or crate_root.startswith("rust/compiler/") or crate_root.startswith("rust/src/")):
+        nvptx_toolchain = "toolchains//:rust_nvptx"
+    rust_toolchain_override = kwargs.pop("_rust_toolchain", None)
+    rust_toolchain = rust_toolchain_override or select({
+        "rust//constraints:target=nvptx64": nvptx_toolchain,
+        "DEFAULT": "toolchains//:rust",
+    })
+    if nvptx_toolchain != "toolchains//:rust":
+        extra_deps.append("//target_specs:nvptx64-vectorware-target-dir")
+    for plat in [
+        "nvptx64-vectorware-compiler",
+        "nvptx64-vectorware-library",
+    ]:
+        env_override = platform.get(plat, {}).get("env", {})
+        platform = platform | {
+            plat: platform.get(plat, {}) | {
+                "env": {"RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-target-dir)"} | env_override,
+            },
+        }
 
     if hasattr(crate_root, "startswith") and crate_root.startswith("rust/library/"):
         default_target_platform = "//platforms/stage1:library"
@@ -119,6 +166,7 @@ def rust_bootstrap_library(
             deps = deps + extra_deps,
             env = env + extra_env if is_select(env) else env | extra_env,
             rustc_flags = rustc_flags + extra_rustc_flags,
+            _rust_toolchain = rust_toolchain,
         ))
     )
 

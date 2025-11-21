@@ -7,6 +7,7 @@ export_file(
 export_file(
     name = "nvptx64-vectorware-linux",
     src = "nvptx64-vectorware-linux.json",
+    out = "nvptx64-vectorware-linux.json",
     visibility = ["PUBLIC"],
 )
 

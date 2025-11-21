@@ -1,4 +1,15 @@
 buildscript.run = true
 
 ['cfg(target_arch = "nvptx64")']
+# Keep hostcall helper available when targeting nvptx.
 extra_deps = ["//hostcall-demo:libc_hostcall"]
+
+['cfg(all(target_arch = "nvptx64", target_vendor = "vectorware"))']
+# Swap in our hostcall-backed libc implementation for the custom nvptx target.
+crate = "libc"
+crate_root = "fixups/libc/libc_hostcall/src/lib.rs"
+extra_srcs = ["fixups/libc/libc_hostcall/src/**"]
+_rust_toolchain = "toolchains//:rust_nvptx"
+default_target_platform = "//platforms/nvptx:library"
+rustc_env = { RUST_TARGET_PATH = "$(location //target_specs:nvptx64-vectorware-target-dir)" }
+labels = ["generated"]

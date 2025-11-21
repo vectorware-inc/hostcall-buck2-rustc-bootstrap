@@ -12,3 +12,7 @@ rustc_flags = [
 [buildscript.run.env]
 # Read by the  build script, but only relevant to libm tests.
 OPT_LEVEL = "3"
+
+['cfg(all(target_arch = "nvptx64", target_vendor = "vectorware"))']
+# Force copied sources for nvptx to ensure __srcs is materialized.
+labels = ["generated"]
