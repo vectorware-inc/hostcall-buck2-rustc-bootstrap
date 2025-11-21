@@ -35,11 +35,8 @@ impl<G: GPUModule> Runtime<G> {
     pub fn new(mut gpu: G) -> Result<Self, G::Error> {
         let buffers = [gpu.alloc(4096).unwrap(), gpu.alloc(4096).unwrap()];
         gpu.write_pointer_to_symbol("__HOSTCALL_BUFF_PTR__", buffers[0])?;
-        let wrote_size = gpu.write_u64_to_symbol(
-            "__HOSTCALL_BUFF_SIZE__",
-            (4096 / size_of::<u64>()) as u64,
-            0,
-        )?;
+        // The CUDA side treats __HOSTCALL_BUFF_SIZE__ as a byte count, so use the full buffer length.
+        let wrote_size = gpu.write_u64_to_symbol("__HOSTCALL_BUFF_SIZE__", 4096, 0)?;
         if !wrote_size {
             eprintln!("[hostcall] failed to write __HOSTCALL_BUFF_SIZE__");
         }
@@ -67,6 +64,10 @@ impl<G: GPUModule> Runtime<G> {
         // Read the buffer the GPU just filled.
         self.gpu
             .read_u64_slice(self.buffers[0], 4096 / size_of::<u64>(), buff)?;
+        // If nothing was written yet, avoid swapping/clearing buffers so we don't race the GPU.
+        if buff.iter().all(|&w| w == 0) {
+            return Ok(());
+        }
         // Prepare the alternate buffer for the next round.
         self.gpu.write_bytes_to_addr(&[0; 4096], self.buffers[1])?;
         self.gpu
