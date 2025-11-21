@@ -11617,7 +11617,7 @@ rust_bootstrap_library(
         "rust/compiler/rustc_target/src/spec/targets/mipsisa64r6el_unknown_linux_gnuabi64.rs",
         "rust/compiler/rustc_target/src/spec/targets/msp430_none_elf.rs",
         "rust/compiler/rustc_target/src/spec/targets/nvptx64_nvidia_cuda.rs",
-        "rust/compiler/rustc_target/src/spec/targets/nvptx64_vectorware_linux.rs",
+        "fixups/rustc_target/nvptx64_vectorware_linux.rs",
         "rust/compiler/rustc_target/src/spec/targets/powerpc64_ibm_aix.rs",
         "rust/compiler/rustc_target/src/spec/targets/powerpc64_unknown_freebsd.rs",
         "rust/compiler/rustc_target/src/spec/targets/powerpc64_unknown_linux_gnu.rs",

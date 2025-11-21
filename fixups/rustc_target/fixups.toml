@@ -1,1 +1,4 @@
-extra_srcs = ["src/spec/targets/*.ld"]
+extra_srcs = [
+    "src/spec/targets/*.ld",
+    "fixups/rustc_target/nvptx64_vectorware_linux.rs",
+]

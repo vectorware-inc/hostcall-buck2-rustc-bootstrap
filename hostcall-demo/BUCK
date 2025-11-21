@@ -32,6 +32,8 @@ native.rust_library(
     edition = "2024",
     visibility = ["PUBLIC"],
     default_target_platform = "//platforms/nvptx:library",
+    resources = ["//target_specs:nvptx64-vectorware-target-dir"],
+    env = {"RUST_TARGET_PATH": "$(location //target_specs:nvptx64-vectorware-target-dir)"},
     deps = [
         "//:alloc",
         "//:core",
