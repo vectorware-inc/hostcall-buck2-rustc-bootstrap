@@ -25,12 +25,6 @@ This repository now exposes native Buck2 targets that cover the demo end to end:
 The PTX rule relies on the vendored `ci-llvm` toolchain plus the nvptx sysroot this
 repository produces; no external nightly toolchain or `build.sh` invocation is needed.
 
-## How to run
-
-1) Install Buck2: follow https://buck2.build/docs/getting_started/install/ (binary or cargo install).
-2) Run the demo without extra logging: `buck2 run //hostcall-demo:hostcalls_bin`.
-3) Run with hostcall debug output: `HOSTCALL_DEBUG=1 buck2 run //hostcall-demo:hostcalls_bin`.
-
 ### Design notes
 
 #### Buck2 layout and flow
