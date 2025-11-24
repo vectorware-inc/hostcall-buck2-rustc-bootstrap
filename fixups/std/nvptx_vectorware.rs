@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(alloc_error_handler)]
+#![feature(alloc_error_handler, rustc_attrs)]
 
 // Minimal std facade for the custom nvptx target. We wire the allocator symbols
 // into libc-hostcall so kernel code can call into host-managed allocation and
@@ -10,65 +10,83 @@ use libc_hostcall::{free, malloc};
 use core::panic::PanicInfo;
 use core::{cmp, ptr};
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_alloc(size: usize, align: usize) -> *mut u8 {
+#[inline]
+unsafe fn hostcall_alloc(size: usize, align: usize) -> *mut u8 {
     // Rely on CUDA's allocator; ensure at least alignment bytes to satisfy common layouts.
     let ptr = unsafe { malloc(size.max(align)) } as *mut u8;
     if ptr.is_null() { core::ptr::null_mut() } else { ptr }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_dealloc(ptr: *mut u8, _size: usize, _align: usize) {
+#[inline]
+unsafe fn hostcall_dealloc(ptr: *mut u8, _size: usize, _align: usize) {
     unsafe { free(ptr.cast()) }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_realloc(
+#[inline]
+unsafe fn hostcall_realloc(
     ptr: *mut u8,
     old_size: usize,
     new_size: usize,
     align: usize,
 ) -> *mut u8 {
-    let new_ptr = __rust_alloc(new_size, align);
+    let new_ptr = hostcall_alloc(new_size, align);
     if !new_ptr.is_null() && !ptr.is_null() {
         ptr::copy_nonoverlapping(ptr, new_ptr, cmp::min(old_size, new_size));
-        __rust_dealloc(ptr, old_size, align);
+        hostcall_dealloc(ptr, old_size, align);
     }
     new_ptr
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_alloc_zeroed(size: usize, align: usize) -> *mut u8 {
-    let ptr = __rust_alloc(size, align);
+#[inline]
+unsafe fn hostcall_alloc_zeroed(size: usize, align: usize) -> *mut u8 {
+    let ptr = hostcall_alloc(size, align);
     if !ptr.is_null() {
         ptr::write_bytes(ptr, 0, size);
     }
     ptr
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_alloc_error_handler(_size: usize, _align: usize) -> ! {
+#[inline]
+fn hostcall_abort() -> ! {
     loop {
         core::hint::spin_loop();
     }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_alloc_error_handler_should_panic_v2() -> ! {
-    loop {
-        core::hint::spin_loop();
+mod __rustc {
+    use super::*;
+
+    // Rust-mangled allocator symbols expected by core/alloc. Using
+    // `rustc_std_internal_symbol` keeps the crate-disambiguated names in sync
+    // with the rest of the std/alloc build so we don't have to hardcode hashes.
+    #[rustc_std_internal_symbol]
+    pub unsafe extern "Rust" fn __rust_alloc(size: usize, align: usize) -> *mut u8 {
+        hostcall_alloc(size, align)
     }
-}
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_no_alloc_shim_is_unstable_v2() {
-    // No-op shim to satisfy allocation symbols.
-}
+    #[rustc_std_internal_symbol]
+    pub unsafe extern "Rust" fn __rust_dealloc(ptr: *mut u8, size: usize, align: usize) {
+        hostcall_dealloc(ptr, size, align)
+    }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __rust_abort() -> ! {
-    loop {
-        core::hint::spin_loop();
+    #[rustc_std_internal_symbol]
+    pub unsafe extern "Rust" fn __rust_realloc(
+        ptr: *mut u8,
+        old_size: usize,
+        new_size: usize,
+        align: usize,
+    ) -> *mut u8 {
+        hostcall_realloc(ptr, old_size, new_size, align)
+    }
+
+    #[rustc_std_internal_symbol]
+    pub unsafe extern "Rust" fn __rust_alloc_zeroed(size: usize, align: usize) -> *mut u8 {
+        hostcall_alloc_zeroed(size, align)
+    }
+
+    #[rustc_std_internal_symbol]
+    pub unsafe extern "Rust" fn __rust_abort() -> ! {
+        hostcall_abort()
     }
 }
 
@@ -93,94 +111,7 @@ pub unsafe extern "C" fn strlen(s: *const u8) -> usize {
     len
 }
 
-// Aliases with the mangled names expected by core/alloc for the default allocator symbols.
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc12___rust_alloc")]
-pub unsafe extern "C" fn __alias_rust_alloc(size: usize, align: usize) -> *mut u8 {
-    __rust_alloc(size, align)
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc14___rust_dealloc")]
-pub unsafe extern "C" fn __alias_rust_dealloc(ptr: *mut u8, size: usize, align: usize) {
-    __rust_dealloc(ptr, size, align)
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc14___rust_realloc")]
-pub unsafe extern "C" fn __alias_rust_realloc(
-    ptr: *mut u8,
-    old_size: usize,
-    new_size: usize,
-    align: usize,
-) -> *mut u8 {
-    __rust_realloc(ptr, old_size, new_size, align)
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc19___rust_alloc_zeroed")]
-pub unsafe extern "C" fn __alias_rust_alloc_zeroed(size: usize, align: usize) -> *mut u8 {
-    __rust_alloc_zeroed(size, align)
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc26___rust_alloc_error_handler")]
-pub unsafe extern "C" fn __alias_rust_alloc_error_handler(size: usize, align: usize) -> ! {
-    __rust_alloc_error_handler(size, align)
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc42___rust_alloc_error_handler_should_panic_v2")]
-pub unsafe extern "C" fn __alias_rust_alloc_error_handler_should_panic_v2() -> ! {
-    __rust_alloc_error_handler_should_panic_v2()
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc35___rust_no_alloc_shim_is_unstable_v2")]
-pub unsafe extern "C" fn __alias_rust_no_alloc_shim_is_unstable_v2() {
-    __rust_no_alloc_shim_is_unstable_v2()
-}
-
-#[unsafe(export_name = "_RNvCscg9VsCuPCyR_7___rustc12___rust_abort")]
-pub unsafe extern "C" fn __alias_rust_abort() -> ! {
-    __rust_abort()
-}
-
 // Rust-mangled allocator symbols expected by core/alloc.
-mod __rustc {
-    use super::*;
-
-    pub unsafe fn __rust_alloc(size: usize, align: usize) -> *mut u8 {
-        super::__rust_alloc(size, align)
-    }
-
-    pub unsafe fn __rust_dealloc(ptr: *mut u8, size: usize, align: usize) {
-        super::__rust_dealloc(ptr, size, align)
-    }
-
-    pub unsafe fn __rust_realloc(
-        ptr: *mut u8,
-        old_size: usize,
-        new_size: usize,
-        align: usize,
-    ) -> *mut u8 {
-        super::__rust_realloc(ptr, old_size, new_size, align)
-    }
-
-    pub unsafe fn __rust_alloc_zeroed(size: usize, align: usize) -> *mut u8 {
-        super::__rust_alloc_zeroed(size, align)
-    }
-
-    pub unsafe fn __rust_alloc_error_handler(size: usize, align: usize) -> ! {
-        super::__rust_alloc_error_handler(size, align)
-    }
-
-    pub unsafe fn __rust_alloc_error_handler_should_panic_v2() -> ! {
-        super::__rust_alloc_error_handler_should_panic_v2()
-    }
-
-    pub unsafe fn __rust_no_alloc_shim_is_unstable_v2() {
-        super::__rust_no_alloc_shim_is_unstable_v2()
-    }
-
-    pub unsafe fn __rust_abort() -> ! {
-        super::__rust_abort()
-    }
-}
-
 #[alloc_error_handler]
 fn alloc_error(_layout: core::alloc::Layout) -> ! {
     loop {
