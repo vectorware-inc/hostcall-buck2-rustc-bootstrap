@@ -2,7 +2,7 @@ https://github.com/user-attachments/assets/78b9050a-dd2a-406b-9c5f-748d41f66ef4
 
 ## VectorWare
 
-See `hostcall-demo/README.md` for the GPU hostcall demo, Buck targets, and run instructions.
+See [hostcall-demo/README.md](hostcall-demo/README.md) for the GPU hostcall demo, Buck targets, and run instructions.
 
 ## Example commands
 
@@ -173,7 +173,7 @@ compilers from source, use `buck2 build stage1:sysroot --out keep/last1`
 
 ## Build speed
 
-See `hostcall-demo/README.md` for the GPU hostcall demo, Buck targets, and run instructions.
+See [hostcall-demo/README.md](hostcall-demo/README.md) for the GPU hostcall demo, Buck targets, and run instructions.
 
 Several factors add to make Buck-based bootstrap consistently faster than the
 Rust repo's custom x.py Cargo-based bootstrap system.
